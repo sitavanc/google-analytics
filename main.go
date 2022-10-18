@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	ga "github.com/ozgur-soft/google-analytics/src"
+	ga "github.com/sitavanc/google-analytics/src"
 )
 
 func main() {

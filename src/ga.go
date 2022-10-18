@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -227,45 +227,53 @@ func (api *API) ParseStruct(prefix string, data map[string]interface{}) (values 
 }
 
 // ParseQuery returns encoded post data
-func (api *API) ParseQuery(str string) string {
-	u, _ := url.Parse(str)
+func (api *API) ParseQuery(str string) (string, error) {
+	u, err := url.Parse(str)
+	if err != nil {
+		return "", err
+	}
 	q := u.Query()
 	u.RawQuery = q.Encode()
 	ret := u.String()
-	return strings.TrimLeft(ret, "?")
+	return strings.TrimLeft(ret, "?"), nil
 }
 
 // Send client data to GA
-func (api *API) Send(client *Client) string {
+func (api *API) Send(client *Client) (string, error) {
 	var apidata []string
 	var iface map[string]interface{}
 	data := new(bytes.Buffer)
 	encoder := json.NewEncoder(data)
-	encoder.Encode(client)
+	err := encoder.Encode(client)
+	if err != nil {
+		return "", err
+	}
 	decoder := json.NewDecoder(data)
 	decoder.UseNumber()
-	decoder.Decode(&iface)
+	err = decoder.Decode(&iface)
+	if err != nil {
+		return "", err
+	}
 	apidata = api.ParseStruct("", iface)
-	postdata := api.ParseQuery("?" + strings.Join(apidata, "&"))
+	postdata, err := api.ParseQuery("?" + strings.Join(apidata, "&"))
+	if err != nil {
+		return "", err
+	}
 	cli := new(http.Client)
 	req, err := http.NewRequest("POST", ApiUrl, strings.NewReader(postdata))
 	if err != nil {
-		return err.Error()
+		return "", err
 	}
 	req.Header.Set("User-Agent", api.UserAgent)
 	req.Header.Set("Content-Type", api.ContentType)
 	res, err := cli.Do(req)
 	if err != nil {
-		return err.Error()
-	} else {
-		//fmt.Println(ApiUrl)
-		//fmt.Println(postdata)
-		//fmt.Println(res.Status)
+		return "", err
 	}
 	defer res.Body.Close()
-	read, err := ioutil.ReadAll(res.Body)
+	read, err := io.ReadAll(res.Body)
 	if err != nil {
-		return err.Error()
+		return "", err
 	}
-	return string(read)
+	return string(read), nil
 }
